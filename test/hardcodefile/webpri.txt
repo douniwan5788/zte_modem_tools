@@ -1,0 +1,5 @@
+WebHTTPSKey=zte12345!@#$%
+WebPrivateKey=Web2019!#%&
+WebRepKey=nE%jA@5b
+DefAdNewPass=aDm8H%MdA
+DefUsNewPass=user

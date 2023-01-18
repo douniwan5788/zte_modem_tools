@@ -1,0 +1,7 @@
+KeyPassphrase=!@#$%12345
+WapiKey=!@#$%12345
+Key1=11111
+Key2=22222
+Key3=33333
+Key4=44444
+WdsKey=!@#$%12345

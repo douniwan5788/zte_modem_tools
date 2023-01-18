@@ -1,0 +1,6 @@
+DefLoidPwdKey=
+DefLoidKey=
+DefPasswordKey=123456
+DefVendor_IDKey=ZTEG
+DefVendor_SpecificKey=00:00:00:01:00:00
+DefRegisterIDKey=123456
