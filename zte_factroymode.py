@@ -193,63 +193,71 @@ class WebFacTelnet(WebFac):
         return False
 
 
-def dealSerial(ip, port, user, pw, action):
+def dealSerial(ip, port, users, pws, action):
+    for user in users:
+        for pw in pws:
+            serial = WebFacSerial(ip, port, user, pw)
+            print("reset facTelnetSteps:")
+            if serial.reset():
+                print("reset OK")
 
-    serial = WebFacSerial(ip, port, user, pw)
-    print("reset facTelnetSteps:")
-    if serial.reset():
-        print("reset OK")
+            print("\nfacStep 1:")
+            serial.requestFactoryMode()
 
-    print("\nfacStep 1:")
-    serial.requestFactoryMode()
+            print("\nfacStep 2:")
+            version = serial.sendSq()
 
-    print("\nfacStep 2:")
-    version = serial.sendSq()
+            if version == 1:
+                print("\nfacStep 3:")
+                serial.checkLoginAuth()
+            elif version == 2:
+                print("\nfacStep 3:")
+                if not serial.sendInfo():
+                    print("sendInfo error")
+                    return
+                print("\nfacStep 4:")
+                serial.checkLoginAuth()
 
-    if version == 1:
-        print("\nfacStep 3:")
-        serial.checkLoginAuth()
-    elif version == 2:
-        print("\nfacStep 3:")
-        if not serial.sendInfo():
-            print("sendInfo error")
-            return
-        print("\nfacStep 4:")
-        serial.checkLoginAuth()
-
-    print("\nfacStep 5:")
-    serial.serialSlience(action)
+            print("\nfacStep 5:")
+            serial.serialSlience(action)
 
 
-def dealTelnet(ip, port, user, pw, action):
+def dealTelnet(ip, port, users, pws, action):
+    for user in users:
+        for pw in pws:
+            print(f"trying  user:\"{user}\" pass:\"{pw}\" ")
+            telnet = WebFacTelnet(ip, port, user, pw)
+            print("reset facTelnetSteps:")
+            if telnet.reset():
+                print("reset OK")
 
-    telnet = WebFacTelnet(ip, port, user, pw)
-    print("reset facTelnetSteps:")
-    if telnet.reset():
-        print("reset OK")
+            print("\nfacStep 1:")
+            telnet.requestFactoryMode()
 
-    print("\nfacStep 1:")
-    telnet.requestFactoryMode()
+            print("\nfacStep 2:")
+            version = telnet.sendSq()
 
-    print("\nfacStep 2:")
-    version = telnet.sendSq()
+            if version == 1:
+                print("\nfacStep 3:")
+                if telnet.checkLoginAuth():
+                    print("\nfacStep 4:")
+            elif version == 2:
+                print("\nfacStep 3:")
+                if not telnet.sendInfo():
+                    print("sendInfo error")
+                    return
+                print("\nfacStep 4:")
+                if not telnet.checkLoginAuth():
+                    print("try next...\n")
+                    continue
+            else:
+                pass
 
-    if version == 1:
-        print("\nfacStep 3:")
-        if telnet.checkLoginAuth():
-            print("\nfacStep 4:")
-    elif version == 2:
-        print("\nfacStep 3:")
-        if not telnet.sendInfo():
-            print("sendInfo error")
-            return
-        print("\nfacStep 4:")
-        telnet.checkLoginAuth()
-    else:
-        pass
-
-    print("\nfacStep 5:")
-    print(telnet.factoryMode(action))
+            print("\nfacStep 5:")
+            url = telnet.factoryMode(action)
+            if url:
+                print(telnet.factoryMode(action))
+                return
 
 
 def parseArgs():
@@ -257,8 +265,12 @@ def parseArgs():
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('ip', nargs="?", help='route ip', default="192.168.1.1")
     parser.add_argument('port', nargs="?", help='router http port', default=80)
-    parser.add_argument('--user', help='factorymode auth username', default='factorymode')
-    parser.add_argument('--pw', help='factorymode auth password', default='nE%jA@5b')
+    parser.add_argument('--user', nargs='+', help='factorymode auth username', default=[
+                        'factorymode', "CMCCAdmin", "CUAdmin", "telecomadmin", "cqadmin",
+                        "user", "admin", "cuadmin", "lnadmin", "useradmin"])
+    parser.add_argument('--pw', nargs='+', help='factorymode auth password', default=[
+                        'nE%jA@5b', "aDm8H%MdA", "CUAdmin", "nE7jA%5m", "cqunicom",
+                        "1620@CTCC", "1620@CUcc", "admintelecom", "cuadmin", "lnadmin",])
     subparsers = parser.add_subparsers(dest='cmd', title='subcommands',
                                        description='valid subcommands',
                                        help='supported commands')
