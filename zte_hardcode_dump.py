@@ -7,7 +7,6 @@ from typing import BinaryIO, List
 from struct import pack, unpack
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
-from Crypto.Util.Padding import pad, unpad
 
 
 # for (i=0
@@ -67,7 +66,7 @@ def dump(hardcoded, hardcodefiles: List[BinaryIO]):
 def parseArgs():
     parser = argparse.ArgumentParser(prog='zte_hardcode_dump', usage='https://github.com/douniwan5788/zte_modem_tools',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('hardcode', help='the /etc/hardcodefile file which contains root key',
+    parser.add_argument('hardcode', help='the /etc/hardcode file which contains root key',
                         type=argparse.FileType('rb'))
     parser.add_argument('hardcodefile', nargs="+", help='config files under /etc/hardcodefile',
                         type=argparse.FileType('rb'))

@@ -278,10 +278,10 @@ def parseArgs():
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('ip', nargs="?", help='route ip', default="192.168.1.1")
     parser.add_argument('port', nargs="?", help='router http port', default=80)
-    parser.add_argument('--user', nargs='+', help='factorymode auth username', default=[
+    parser.add_argument('--user', '-u', nargs='+', help='factorymode auth username', default=[
                         'factorymode', "CMCCAdmin", "CUAdmin", "telecomadmin", "cqadmin",
                         "user", "admin", "cuadmin", "lnadmin", "useradmin"])
-    parser.add_argument('--pw', nargs='+', help='factorymode auth password', default=[
+    parser.add_argument('--pass', '-p', metavar='PASS', dest='pw', nargs='+', help='factorymode auth password', default=[
                         'nE%jA@5b', "aDm8H%MdA", "CUAdmin", "nE7jA%5m", "cqunicom",
                         "1620@CTCC", "1620@CUcc", "admintelecom", "cuadmin", "lnadmin",])
     subparsers = parser.add_subparsers(dest='cmd', title='subcommands',
