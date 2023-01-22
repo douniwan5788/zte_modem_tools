@@ -1,3 +1,11 @@
+# ENV
+
+```
+python3 -m venv .venv
+source ./.venv/bin/activate
+pip install -r requirements.txt
+```
+
 # zte_factroymode.py
 
 open telnet(use embed user/pass to 192.168.1.1 80):
@@ -9,7 +17,7 @@ or custom args
 `python3 zte_factroymode.py --user CUAdmin --pass CUAdmin -- 192.168.1.1 80 telnet open`
 
 ```shell
-$ python3 zte_factroymode.py -h    
+$ python3 zte_factroymode.py -h
 usage: zte_factroymode [-h] [--user USER [USER ...]] [--pass PASS [PASS ...]] [ip] [port] {telnet,serial} ...
 
 positional arguments:
@@ -38,6 +46,7 @@ https://github.com/douniwan5788/zte_modem_tools
 # zte_hardcode_dump.py
 
 decrypt /etc/hardcodefile
+
 `./zte_hardcode_dump.py test/hardcode test/hardcodefile/*`
 
 ```shell

