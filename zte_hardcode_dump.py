@@ -64,7 +64,7 @@ def dump(hardcoded, hardcodefiles: List[BinaryIO]):
 
 
 def parseArgs():
-    parser = argparse.ArgumentParser(prog='zte_hardcode_dump', usage='https://github.com/douniwan5788/zte_modem_tools',
+    parser = argparse.ArgumentParser(prog='zte_hardcode_dump', epilog='https://github.com/douniwan5788/zte_modem_tools',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('hardcode', help='the /etc/hardcode file which contains root key',
                         type=argparse.FileType('rb'))

@@ -7,16 +7,16 @@ from Crypto.Cipher import AES
 
 
 def pad(data_to_pad, block_size):
-    # zero-pad
+    # zero-pad, pad one byte at least
 
     padding_len = block_size-len(data_to_pad) % block_size
     return data_to_pad+b'\x00'*padding_len
 
 
 def unpad(padded_data, block_size):
-    # zero-unpad, only work for null terminated string
+    # zero-unpad, only work for null-terminated string
 
-    return padded_data[:-block_size] + block_size[-block_size:].rstrip(b'\x00')
+    return padded_data[:-block_size] + padded_data[-block_size:].rstrip(b'\x00')
 
 
 class WebFac:
@@ -130,12 +130,18 @@ class WebFac:
             resp = self.S.post(
                 f"http://{self.ip}:{self.port}/webFacEntry",
                 data=self.chiper.encrypt(
+                    # httpd will alloc 1 more byte to ensure null terminated, anyway we add one more null to ensure
                     pad(f'CheckLoginAuth.gch?version50&user={self.user}&pass={self.pw}'.encode(), 16)
                 ))
-            print(repr(resp.text))
+            # print(repr(resp.text))
             if resp.status_code == 200:
+                # checkLoginAuth use wrong function strlen to calc response size, so we may need to pad ciphertext first
+                ciphertext = resp.content
+                # print(len(ciphertext))
+                if len(ciphertext) % 16:
+                    ciphertext = pad(ciphertext, 16)
+                url = unpad(self.chiper.decrypt(ciphertext), 16)
                 # resp should be "FactoryMode.gch"
-                url = unpad(self.chiper.decrypt(pad(resp.content, 16)))
                 return url
             elif resp.status_code == 400:
                 print("protocol error")
@@ -190,7 +196,7 @@ class WebFacTelnet(WebFac):
             # print(repr(resp.text))
             if resp.status_code == 200:
                 # resp should be "FactoryModeAuth.gch?user=<telnetuser>&pass=<telnetpass>"
-                url = self.chiper.decrypt(resp.content)
+                url = unpad(self.chiper.decrypt(resp.content), 16)
                 return url
             elif resp.status_code == 400:
                 print("protocol error")
@@ -274,7 +280,7 @@ def dealTelnet(ip, port, users, pws, action):
 
 
 def parseArgs():
-    parser = argparse.ArgumentParser(prog='zte_factroymode', usage='https://github.com/douniwan5788/zte_modem_tools',
+    parser = argparse.ArgumentParser(prog='zte_factroymode', epilog='https://github.com/douniwan5788/zte_modem_tools',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('ip', nargs="?", help='route ip', default="192.168.1.1")
     parser.add_argument('port', nargs="?", help='router http port', default=80)

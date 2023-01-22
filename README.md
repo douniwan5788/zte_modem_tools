@@ -6,11 +6,11 @@ open telnet(use embed user/pass to 192.168.1.1 80):
 
 or custom args
 
-`python3 zte_factroymode.py --user CUAdmin --pw CUAdmin -- 192.168.1.1 80 telnet open`
+`python3 zte_factroymode.py --user CUAdmin --pass CUAdmin -- 192.168.1.1 80 telnet open`
 
 ```shell
-$ python3 zte_factroymode.py -h
-usage: https://github.com/douniwan5788/zte_modem_tools
+$ python3 zte_factroymode.py -h    
+usage: zte_factroymode [-h] [--user USER [USER ...]] [--pass PASS [PASS ...]] [ip] [port] {telnet,serial} ...
 
 positional arguments:
   ip                    route ip (default: 192.168.1.1)
@@ -19,11 +19,11 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   --user USER [USER ...], -u USER [USER ...]
-                        factorymode auth username (default: ['factorymode', 'CMCCAdmin', 'CUAdmin', 'telecomadmin', 'cqadmin', 'user',
-                        'admin', 'cuadmin', 'lnadmin', 'useradmin'])
-  --pass PW [PW ...], -p PW [PW ...]
-                        factorymode auth password (default: ['nE%jA@5b', 'aDm8H%MdA', 'CUAdmin', 'nE7jA%5m', 'cqunicom', '1620@CTCC',
-                        '1620@CUcc', 'admintelecom', 'cuadmin', 'lnadmin'])
+                        factorymode auth username (default: ['factorymode', 'CMCCAdmin', 'CUAdmin',
+                        'telecomadmin', 'cqadmin', 'user', 'admin', 'cuadmin', 'lnadmin', 'useradmin'])
+  --pass PASS [PASS ...], -p PASS [PASS ...]
+                        factorymode auth password (default: ['nE%jA@5b', 'aDm8H%MdA', 'CUAdmin', 'nE7jA%5m',
+                        'cqunicom', '1620@CTCC', '1620@CUcc', 'admintelecom', 'cuadmin', 'lnadmin'])
 
 subcommands:
   valid subcommands
@@ -31,6 +31,8 @@ subcommands:
   {telnet,serial}       supported commands
     telnet              control telnet services on/off
     serial              control /proc/serial on/off
+
+https://github.com/douniwan5788/zte_modem_tools
 ```
 
 # zte_hardcode_dump.py
@@ -39,8 +41,8 @@ decrypt /etc/hardcodefile
 `./zte_hardcode_dump.py test/hardcode test/hardcodefile/*`
 
 ```shell
-$ ./zte_hardcode_dump.py -h
-usage: https://github.com/douniwan5788/zte_modem_tools
+$ python3 zte_hardcode_dump.py -h
+usage: zte_hardcode_dump [-h] hardcode hardcodefile [hardcodefile ...]
 
 positional arguments:
   hardcode      the /etc/hardcode file which contains root key
@@ -48,4 +50,6 @@ positional arguments:
 
 options:
   -h, --help    show this help message and exit
+
+https://github.com/douniwan5788/zte_modem_tools
 ```
