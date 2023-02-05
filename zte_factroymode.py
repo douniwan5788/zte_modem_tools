@@ -96,7 +96,7 @@ class WebFac:
                 key_pool = WebFacTelnet.AES_KEY_POOL_NEW
                 version = 2
             else:
-                print("protocol version not match")
+                print("protocol error")
                 return False
 
             key = map(lambda x: (x ^ 0xA5) & 0xFF, key_pool[index:index+24])
@@ -105,7 +105,7 @@ class WebFac:
             self.chiper = AES.new(key, AES.MODE_ECB)
             return version
         except requests.exceptions.ConnectionError:
-            print("protocol version not match?")
+            print("protocol error?")
         except Exception as e:
             print(e)
         return False
@@ -120,7 +120,7 @@ class WebFac:
             elif resp.status_code == 400:
                 print("protocol error")
             elif resp.status_code == 401:
-                print("user/pass error")
+                print("info error")
         except Exception as e:
             print(e)
         return False
@@ -189,6 +189,7 @@ class WebFacTelnet(WebFac):
                         pad(f'FactoryMode.gch?{action}'.encode(), 16)
                     ))
             else:
+                # mode 1:ops 2:dev 3:production 4:user
                 resp = self.S.post(
                     f"http://{self.ip}:{self.port}/webFacEntry",
                     data=self.chiper.encrypt(
@@ -215,7 +216,7 @@ def dealFacAuth(Class: WebFac, ip, port, users, pws):
     for user in users:
         for pw in pws:
             print(f"trying  user:\"{user}\" pass:\"{pw}\" ")
-            webfac = Class(ip, port, user, pw)
+            webfac: WebFac = Class(ip, port, user, pw)
             print("reset facTelnetSteps:")
             if webfac.reset():
                 print("reset OK!\n")
@@ -267,6 +268,7 @@ def dealSerial(ip, port, users, pws, action):
 def dealTelnet(ip, port, users, pws, action):
     telnet = dealFacAuth(WebFacTelnet, ip, port, users, pws)
     if not telnet:
+        print('No Luck!')
         return
 
     print("facStep 5:")
@@ -281,14 +283,15 @@ def dealTelnet(ip, port, users, pws, action):
 def parseArgs():
     parser = argparse.ArgumentParser(prog='zte_factroymode', epilog='https://github.com/douniwan5788/zte_modem_tools',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('ip', nargs="?", help='route ip', default="192.168.1.1")
-    parser.add_argument('port', nargs="?", help='router http port', default=80)
+
     parser.add_argument('--user', '-u', nargs='+', help='factorymode auth username', default=[
                         'factorymode', "CMCCAdmin", "CUAdmin", "telecomadmin", "cqadmin",
                         "user", "admin", "cuadmin", "lnadmin", "useradmin"])
     parser.add_argument('--pass', '-p', metavar='PASS', dest='pw', nargs='+', help='factorymode auth password', default=[
                         'nE%jA@5b', "aDm8H%MdA", "CUAdmin", "nE7jA%5m", "cqunicom",
                         "1620@CTCC", "1620@CUcc", "admintelecom", "cuadmin", "lnadmin"])
+    parser.add_argument('--ip', help='route ip', default="192.168.1.1")
+    parser.add_argument('--port', help='router http port', type=int, default=80)
     subparsers = parser.add_subparsers(dest='cmd', title='subcommands',
                                        description='valid subcommands',
                                        help='supported commands')

@@ -14,24 +14,20 @@ open telnet(use embed user/pass to 192.168.1.1 80):
 
 or custom args
 
-`python3 zte_factroymode.py --user CUAdmin --pass CUAdmin -- 192.168.1.1 80 telnet open`
+`python3 zte_factroymode.py --user CUAdmin --pass CUAdmin --ip 192.168.1.1 --port 80 telnet open`
 
 ```shell
-$ python3 zte_factroymode.py -h
-usage: zte_factroymode [-h] [--user USER [USER ...]] [--pass PASS [PASS ...]] [ip] [port] {telnet,serial} ...
-
-positional arguments:
-  ip                    route ip (default: 192.168.1.1)
-  port                  router http port (default: 80)
+$ python3 ./zte_factroymode.py -h
+usage: zte_factroymode [-h] [--user USER [USER ...]] [--pass PASS [PASS ...]] [--ip IP] [--port PORT] {telnet,serial} ...
 
 options:
   -h, --help            show this help message and exit
   --user USER [USER ...], -u USER [USER ...]
-                        factorymode auth username (default: ['factorymode', 'CMCCAdmin', 'CUAdmin',
-                        'telecomadmin', 'cqadmin', 'user', 'admin', 'cuadmin', 'lnadmin', 'useradmin'])
+                        factorymode auth username (default: ['factorymode', 'CMCCAdmin', 'CUAdmin', 'telecomadmin', 'cqadmin', 'user', 'admin', 'cuadmin', 'lnadmin', 'useradmin'])
   --pass PASS [PASS ...], -p PASS [PASS ...]
-                        factorymode auth password (default: ['nE%jA@5b', 'aDm8H%MdA', 'CUAdmin', 'nE7jA%5m',
-                        'cqunicom', '1620@CTCC', '1620@CUcc', 'admintelecom', 'cuadmin', 'lnadmin'])
+                        factorymode auth password (default: ['nE%jA@5b', 'aDm8H%MdA', 'CUAdmin', 'nE7jA%5m', 'cqunicom', '1620@CTCC', '1620@CUcc', 'admintelecom', 'cuadmin', 'lnadmin'])
+  --ip IP               route ip (default: 192.168.1.1)
+  --port PORT           router http port (default: 80)
 
 subcommands:
   valid subcommands
@@ -50,7 +46,7 @@ decrypt /etc/hardcodefile
 `./zte_hardcode_dump.py test/hardcode test/hardcodefile/*`
 
 ```shell
-$ python3 zte_hardcode_dump.py -h
+$ python3 ./zte_hardcode_dump.py -h
 usage: zte_hardcode_dump [-h] hardcode hardcodefile [hardcodefile ...]
 
 positional arguments:
