@@ -235,6 +235,7 @@ def dealFacAuth(Class: WebFac, ip, port, users, pws):
                 if webfac.checkLoginAuth():
                     print("facStep 4:")
                     print("OK!\n")
+                    return webfac
             elif version == 2:
                 print("facStep 3:")
                 if not webfac.sendInfo():
