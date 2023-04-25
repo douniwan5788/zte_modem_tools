@@ -4,6 +4,7 @@ import requests
 import argparse
 from random import Random
 from Crypto.Cipher import AES
+from urllib.parse import urlparse, parse_qs
 
 
 def pad(data_to_pad, block_size):
@@ -276,7 +277,12 @@ def dealTelnet(ip, port, users, pws, action):
     url = telnet.factoryMode(action)
     if url:
         print("OK!\n")
-        print(repr(url))
+        # print(repr(url))
+        parsed_url = urlparse(url.decode('utf-8').rstrip('\x00'))
+        user = parse_qs(parsed_url.query)['user'][0]
+        passw = parse_qs(parsed_url.query)['pass'][0]
+        print("Username: " + user)
+        print("Password: " + passw)
         print('done')
         return
 
