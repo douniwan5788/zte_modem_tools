@@ -277,6 +277,10 @@ def dealTelnet(ip, port, users, pws, action):
     if url:
         print("OK!\n")
         print(repr(url))
+        username = url.decode().partition("user=")[2].partition("&pass")[0]
+        password = url.decode().partition("pass=")[2].partition("\\x")[0]        
+        print("username-- "+ username)
+        print("password-- "+ password)
         print('done')
         return
 
