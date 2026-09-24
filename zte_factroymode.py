@@ -2,9 +2,11 @@
 # -*- coding: utf-8 -*-
 import requests
 import argparse
+import urllib3
 from random import Random
 from Crypto.Cipher import AES
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def pad(data_to_pad, block_size):
     # zero-pad, pad one byte at least
@@ -53,17 +55,18 @@ class WebFac:
         self.user = user
         self.pw = pw
         self.S = requests.Session()
+        self.S.verify = False
 
     def reset(self):
         # any wrong step request should reset the facTelnetStep
-        resp = self.S.post(f"http://{self.ip}:{self.port}/webFac", data='SendSq.gch')
+        resp = self.S.post(f"https://{self.ip}:{self.port}/webFac", data='SendSq.gch')
         if resp.status_code == 400:
             return True
         return False
 
     def requestFactoryMode(self):
         try:
-            self.S.post(f"http://{self.ip}:{self.port}/webFac", data='RequestFactoryMode.gch')
+            self.S.post(f"https://{self.ip}:{self.port}/webFac", data='RequestFactoryMode.gch')
         except requests.exceptions.ConnectionError:
             # this is normal
             pass
@@ -76,7 +79,7 @@ class WebFac:
             rand = Random().randint(0, 59)
 
             # the byte after last digital can not be null
-            resp = self.S.post(f"http://{self.ip}:{self.port}/webFac", data=f'SendSq.gch?rand={rand}\r\n')
+            resp = self.S.post(f"https://{self.ip}:{self.port}/webFac", data=f'SendSq.gch?rand={rand}\r\n')
             if resp.status_code != 200:
                 return False
             # print(repr(resp.text))
@@ -112,7 +115,7 @@ class WebFac:
 
     def sendInfo(self):
         try:
-            resp = self.S.post(f"http://{self.ip}:{self.port}/webFacEntry",
+            resp = self.S.post(f"https://{self.ip}:{self.port}/webFacEntry",
                                data=self.chiper.encrypt(pad(f'SendInfo.gch?info=6|'.encode(), 16)))
             # print(resp.status_code, repr(resp.text))
             if resp.status_code == 200:
@@ -128,7 +131,7 @@ class WebFac:
     def checkLoginAuth(self):
         try:
             resp = self.S.post(
-                f"http://{self.ip}:{self.port}/webFacEntry",
+                f"https://{self.ip}:{self.port}/webFacEntry",
                 data=self.chiper.encrypt(
                     # httpd will alloc 1 more byte to ensure null terminated, anyway we add one more null to ensure
                     pad(f'CheckLoginAuth.gch?version50&user={self.user}&pass={self.pw}'.encode(), 16)
@@ -162,7 +165,7 @@ class WebFacSerial(WebFac):
     def serialSlience(self, action):
         try:
             resp = self.S.post(
-                f"http://{self.ip}:{self.port}/webFacEntry",
+                f"https://{self.ip}:{self.port}/webFacEntry",
                 data=self.chiper.encrypt(
                     pad(f'SerialSlience.gch?action={action}'.encode(), 16)
                 ))
@@ -184,14 +187,14 @@ class WebFacTelnet(WebFac):
         try:
             if action == 'close':
                 resp = self.S.post(
-                    f"http://{self.ip}:{self.port}/webFacEntry",
+                    f"https://{self.ip}:{self.port}/webFacEntry",
                     data=self.chiper.encrypt(
                         pad(f'FactoryMode.gch?{action}'.encode(), 16)
                     ))
             else:
                 # mode 1:ops 2:dev 3:production 4:user
                 resp = self.S.post(
-                    f"http://{self.ip}:{self.port}/webFacEntry",
+                    f"https://{self.ip}:{self.port}/webFacEntry",
                     data=self.chiper.encrypt(
                         pad('FactoryMode.gch?mode=2&user=notused'.encode(), 16)
                     ))
@@ -292,7 +295,7 @@ def parseArgs():
                         'nE%jA@5b', "aDm8H%MdA", "CUAdmin", "nE7jA%5m", "cqunicom",
                         "1620@CTCC", "1620@CUcc", "admintelecom", "cuadmin", "lnadmin"])
     parser.add_argument('--ip', help='route ip', default="192.168.1.1")
-    parser.add_argument('--port', help='router http port', type=int, default=80)
+    parser.add_argument('--port', help='router https port', type=int, default=443)
     subparsers = parser.add_subparsers(dest='cmd', title='subcommands',
                                        description='valid subcommands',
                                        help='supported commands')
