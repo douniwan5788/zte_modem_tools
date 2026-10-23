@@ -39,6 +39,33 @@ subcommands:
 https://github.com/douniwan5788/zte_modem_tools
 ```
 
+## HTTPS
+
+Para acessar a interface web da ONT por HTTPS:
+
+```shell
+python zte_factroymode.py --ip 192.168.1.1 --https --port 443 telnet open
+```
+
+A opção `--https` altera o protocolo, mas a porta padrão continua sendo 80.
+Informe a porta HTTPS configurada no equipamento. O script aceita certificados
+autoassinados sem verificar o certificado.
+
+## Diagnóstico
+
+Para exibir detalhes da negociação do protocolo:
+
+```shell
+python zte_factroymode.py --ip 192.168.1.1 --debug telnet open
+```
+
+O script implementa os protocolos v1, v2 (`newrand`) e v3 (`re_rand`).
+A compatibilidade depende do modelo e do firmware da ONT.
+
+A opção `--port` configura a porta da interface web HTTP/HTTPS, não a do Telnet.
+Ao habilitar o Telnet, o script exibe as credenciais retornadas pelo equipamento.
+Ele não inicia uma sessão Telnet nem executa restauração de fábrica.
+
 # zte_hardcode_dump.py
 
 decrypt /etc/hardcodefile

